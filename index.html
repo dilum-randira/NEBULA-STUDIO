@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nebula Studio Pro - Ultimate Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap');
+        body { margin: 0; overflow: hidden; background-color: #030303; font-family: 'Inter', sans-serif; }
+        canvas { display: block; }
+        .glass { background: rgba(10, 10, 10, 0.75); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        #video-preview { 
+            position: absolute; bottom: 24px; right: 24px; width: 200px; height: 150px; 
+            border-radius: 20px; overflow: hidden; border: 2px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+        video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; }
+        .nav-btn {
+            text-align: left; padding: 10px 18px; border-radius: 12px; font-size: 11px;
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+            transition: all 0.3s ease; color: rgba(255,255,255,0.5);
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-btn.active { background: rgba(255,255,255,0.15); color: #22d3ee; border-left: 3px solid #22d3ee; }
+    </style>
+</head>
+<body>
+
+    <div id="ui" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-10">
+        <div class="flex justify-between items-start">
+            <div class="glass p-8 rounded-[32px] text-white pointer-events-auto">
+                <h1 class="text-2xl font-black tracking-tighter text-cyan-400 leading-none">NEBULA STUDIO</h1>
+                <p class="text-[9px] uppercase tracking-[0.4em] opacity-40 mt-2 font-bold">Interactive AI Engine v2.0</p>
+                
+                <div id="status" class="mt-8 flex items-center gap-3">
+                    <div id="status-dot" class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                    <span id="status-text" class="text-[10px] font-bold uppercase tracking-widest opacity-70">Initializing MediaPipe...</span>
+                </div>
+            </div>
+
+            <div id="menu" class="glass p-3 rounded-[24px] text-white flex flex-col gap-1 pointer-events-auto min-w-[180px]">
+                <button onclick="setTemplate('flower', this)" class="nav-btn active">Lotus Bloom</button>
+                <button onclick="setTemplate('fireworks', this)" class="nav-btn">Supernova</button>
+                <button onclick="setTemplate('saturn', this)" class="nav-btn">Ringed World</button>
+                <button onclick="setTemplate('heart', this)" class="nav-btn">Heart Core</button>
+                <button onclick="setTemplate('cloud', this)" class="nav-btn">Cosmic Cloud</button>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center gap-4">
+            <div id="hint-box" class="glass px-10 py-4 rounded-full text-white text-[10px] font-black uppercase tracking-[0.4em] opacity-0 transition-all duration-700">
+                Tracking Ready
+            </div>
+        </div>
+
+        <div id="video-preview">
+            <video id="webcam" playsinline></video>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const hintBox = document.getElementById('hint-box');
+        
+        let scene, camera, renderer, particles;
+        const particleCount = 15000;
+        let positions, colors;
+        let geometry;
+        
+        let targetPositions = new Float32Array(particleCount * 3);
+        let currentTheme = new THREE.Color(0x22d3ee);
+
+        // Movement Smoothing
+        let rawX = 0, rawY = 0, rawZ = 0;
+        let smoothX = 0, smoothY = 0, smoothZ = 0;
+        const lerpFactor = 0.12;
+
+        let handDetected = false;
+        let pinching = false;
+        let activeTemplate = 'flower';
+        let bloomProgress = 0;
+
+        function initThree() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 8;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.body.appendChild(renderer.domElement);
+
+            geometry = new THREE.BufferGeometry();
+            positions = new Float32Array(particleCount * 3);
+            colors = new Float32Array(particleCount * 3);
+
+            // Initial random state
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 30;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 30;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.04,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            generateTemplateData('flower');
+            window.addEventListener('resize', onResize);
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function setTemplate(name, btn) {
+            activeTemplate = name;
+            bloomProgress = 0;
+            generateTemplateData(name);
+            
+            // Update UI
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+
+            // Themes
+            if(name === 'flower') currentTheme.setHex(0xff77bb);
+            else if(name === 'fireworks') currentTheme.setHex(0xffffff);
+            else if(name === 'saturn') currentTheme.setHex(0x00aaff);
+            else if(name === 'heart') currentTheme.setHex(0xff2244);
+            else currentTheme.setHex(0x22d3ee);
+        }
+
+        function generateTemplateData(type) {
+            for (let i = 0; i < particleCount; i++) {
+                let x, y, z;
+                const t = Math.random() * Math.PI * 2;
+                const u = Math.random() * 2 - 1;
+
+                if (type === 'flower') {
+                    const angle = (i / particleCount) * Math.PI * 24;
+                    const rBase = Math.abs(Math.cos(2.5 * angle));
+                    const r = 0.6 + rBase * 3.0;
+                    x = Math.cos(angle) * r;
+                    y = Math.sin(angle) * r;
+                    z = Math.sin(angle * 0.5) * 0.8;
+                } else if (type === 'fireworks') {
+                    const speed = 1.0 + Math.random() * 5.0;
+                    x = Math.cos(t) * Math.sqrt(1 - u * u) * speed;
+                    y = Math.sin(t) * Math.sqrt(1 - u * u) * speed;
+                    z = u * speed;
+                } else if (type === 'saturn') {
+                    if (i < particleCount * 0.4) { // Sphere
+                        const phi = Math.acos(u);
+                        x = Math.sin(phi) * Math.cos(t) * 1.6;
+                        y = Math.sin(phi) * Math.sin(t) * 1.6;
+                        z = Math.cos(phi) * 1.6;
+                    } else { // Rings
+                        const ringR = 2.8 + Math.random() * 1.4;
+                        x = Math.cos(t) * ringR;
+                        y = Math.sin(t) * ringR * 0.22;
+                        z = Math.sin(t) * 0.3;
+                    }
+                } else if (type === 'heart') {
+                    const v = (i / particleCount) * Math.PI * 2;
+                    x = 0.2 * (16 * Math.pow(Math.sin(v), 3));
+                    y = 0.2 * (13 * Math.cos(v) - 5 * Math.cos(2 * v) - 2 * Math.cos(3 * v) - Math.cos(4 * v));
+                    z = (Math.random() - 0.5) * 0.6;
+                } else { // Cloud
+                    x = (Math.random() - 0.5) * 16;
+                    y = (Math.random() - 0.5) * 16;
+                    z = (Math.random() - 0.5) * 16;
+                }
+                
+                targetPositions[i * 3] = x;
+                targetPositions[i * 3 + 1] = y;
+                targetPositions[i * 3 + 2] = z;
+            }
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.75,
+            minTrackingConfidence: 0.75
+        });
+
+        hands.onResults((results) => {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                handDetected = true;
+                const landmark = results.multiHandLandmarks[0][9]; // Middle finger base
+                const thumb = results.multiHandLandmarks[0][4];
+                const index = results.multiHandLandmarks[0][8];
+
+                // Scale camera 0-1 to Three space
+                rawX = (0.5 - landmark.x) * 22;
+                rawY = (0.5 - landmark.y) * 16;
+                rawZ = landmark.z * 15;
+
+                const pinchDist = Math.sqrt(Math.pow(thumb.x - index.x, 2) + Math.pow(thumb.y - index.y, 2));
+                pinching = pinchDist < 0.042;
+
+                hintBox.style.opacity = "1";
+                hintBox.innerText = pinching ? "Interaction: Attraction" : "Interaction: Repulsion";
+                statusDot.className = "w-2 h-2 rounded-full bg-cyan-400";
+                statusText.innerText = "Tracking Online";
+            } else {
+                handDetected = false;
+                hintBox.style.opacity = "0";
+                statusDot.className = "w-2 h-2 rounded-full bg-orange-500 animate-pulse";
+                statusText.innerText = "Searching for Hand...";
+            }
+        });
+
+        const cameraFeed = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 640,
+            height: 480
+        });
+        cameraFeed.start();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // EMA Smoothing
+            smoothX += (rawX - smoothX) * lerpFactor;
+            smoothY += (rawY - smoothY) * lerpFactor;
+            smoothZ += (rawZ - smoothZ) * lerpFactor;
+
+            // Blossom Logic
+            if (activeTemplate === 'flower' && bloomProgress < 1) {
+                bloomProgress += 0.006;
+            }
+
+            const pos = geometry.attributes.position.array;
+            const col = geometry.attributes.color.array;
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                
+                let tx = targetPositions[i3];
+                let ty = targetPositions[i3+1];
+                let tz = targetPositions[i3+2];
+
+                // Apply Bloom Progression
+                if (activeTemplate === 'flower') {
+                    const scale = 0.15 + (bloomProgress * 0.85);
+                    tx *= scale;
+                    ty *= scale;
+                    tz *= scale;
+                }
+
+                // Morphing
+                pos[i3] += (tx - pos[i3]) * 0.05;
+                pos[i3+1] += (ty - pos[i3+1]) * 0.05;
+                pos[i3+2] += (tz - pos[i3+2]) * 0.05;
+
+                // Physics logic
+                if (handDetected) {
+                    const dx = smoothX - pos[i3];
+                    const dy = smoothY - pos[i3+1];
+                    const dz = smoothZ - pos[i3+2];
+                    const dSq = dx*dx + dy*dy + dz*dz;
+                    
+                    if (dSq < 25) {
+                        const d = Math.sqrt(dSq) || 1;
+                        const force = pinching ? 0.15 : -0.07;
+                        pos[i3] += (dx / d) * force;
+                        pos[i3+1] += (dy / d) * force;
+                        pos[i3+2] += (dz / d) * force;
+                    }
+                }
+
+                // Color Shimmer
+                const time = Date.now() * 0.0015;
+                const brightness = Math.sin(time + i * 0.02) * 0.25 + 0.75;
+                col[i3] = currentTheme.r * brightness;
+                col[i3+1] = currentTheme.g * brightness;
+                col[i3+2] = currentTheme.b * brightness;
+            }
+
+            geometry.attributes.position.needsUpdate = true;
+            geometry.attributes.color.needsUpdate = true;
+
+            particles.rotation.y += 0.0015;
+            renderer.render(scene, camera);
+        }
+
+        window.onload = () => {
+            initThree();
+            animate();
+        };
+    </script>
+</body>
+</html>
