@@ -16,7 +16,7 @@ Users can sculpt, attract, repel, and morph thousands of particles into dynamic 
 ## 🔗 Live Demo
 
 👉 **Live Demo:**  
-https://dilum-randira/.github.io/NEBULA-STUDIO/
+https://dilum-randira.github.io/NEBULA-STUDIO/
 
 > Allow camera access when prompted.  
 > Best experienced on desktop using Google Chrome or Microsoft Edge.
