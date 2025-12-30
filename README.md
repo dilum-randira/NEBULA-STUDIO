@@ -93,3 +93,4 @@ YouTube: *Tech Stories by Dilum*
 - Webcam quality directly affects gesture precision
 
   jiwf oifhr rb
+  wedi wbice
