@@ -91,3 +91,5 @@ YouTube: *Tech Stories by Dilum*
 - Best performance in a well-lit environment
 - A clearly visible hand improves tracking accuracy
 - Webcam quality directly affects gesture precision
+
+  jiwf oifhr rb
