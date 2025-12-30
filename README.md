@@ -97,10 +97,3 @@ YouTube: *Tech Stories by Dilum*
 ihe uw uweb
 cbowbucb uebbc
 sabcuo eufowc
-jbbqewk qebul
-jcdew jccbewl
-lqic lqi
-piehfc ibv
-sivpdh obuewd
-jbke ebjquc
-wjelb jwbe
