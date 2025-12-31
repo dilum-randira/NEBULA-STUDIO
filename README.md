@@ -92,3 +92,4 @@ YouTube: *Tech Stories by Dilum*
 - A clearly visible hand improves tracking accuracy
 - Webcam quality directly affects gesture precision
 ghfg
+yiiyf
