@@ -1,5 +1,3 @@
-
-https://github.com/user-attachments/assets/f4b8d5c0-450a-4da5-a878-24bb89521d15
 # 🌌 Nebula Studio
 
 **Nebula Studio** is an interactive 3D particle visualizer built with Three.js and MediaPipe Hand Tracking. It transforms a standard webcam into a spatial controller, allowing users to manipulate digital matter in real time using natural hand gestures.
